@@ -204,3 +204,34 @@ def test_read_isq_requires_calibration_for_density(tmp_path):
 
     with pytest.raises(ValueError, match="ISQ calibration metadata"):
         api.read_isq(str(path), unit="density")
+
+
+def test_read_isq_accepts_zero_byte_count_with_block_count(tmp_path):
+    data = np.arange(24, dtype=np.int16).reshape(2,3,4)
+    path = tmp_path/'block-count.ISQ'
+    _write_tiny_isq(path, data, extended_calibration=True)
+    header = bytearray(path.read_bytes())
+    struct.pack_into('<i', header, 20, 0)
+    path.write_bytes(header)
+    actual, meta = api.read_isq(str(path))
+    np.testing.assert_array_equal(actual, data)
+    assert meta['nr_of_bytes'] == 0
+
+
+def test_read_isq_rejects_truncated_payload_before_allocation(tmp_path):
+    path = tmp_path/'truncated.ISQ'
+    _write_tiny_isq(path, np.zeros((2,3,4), np.int16))
+    path.write_bytes(path.read_bytes()[:-2])
+    with pytest.raises((ValueError, RuntimeError), match='payload|truncat'):
+        api.read_isq(str(path))
+
+
+def test_calibrated_isq_float32_default_and_float64_override(tmp_path):
+    path = tmp_path/'calibrated.ISQ'
+    data = np.array([[[0,4096]]], np.int16)
+    _write_tiny_isq(path, data, extended_calibration=True)
+    density, _ = api.read_isq(str(path), unit='bmd')
+    precise, _ = api.read_isq(str(path), unit='bmd', dtype=np.float64)
+    assert density.dtype == np.float32
+    assert precise.dtype == np.float64
+    np.testing.assert_allclose(density, precise)

@@ -199,12 +199,13 @@ def read_aim(path: str, density: bool = False, hu: bool = False) -> Tuple[np.nda
     return arr, meta
 
 
-def read_isq(path: str, unit: str = "native") -> Tuple[np.ndarray, dict]:
+def read_isq(path: str, unit: str = "native", *, dtype=np.float32) -> Tuple[np.ndarray, dict]:
     """Read an ISQ file and optionally convert native values to HU or BMD.
 
     Parameters:
         path: ISQ file path
         unit: one of ``"native"``, ``"hu"``, ``"density"``, or ``"bmd"``
+        dtype: calibrated output float32 (default) or float64. Native remains int16.
 
     Returns:
         (array, meta) where array is a numpy ndarray with shape (z, y, x)
@@ -217,6 +218,9 @@ def read_isq(path: str, unit: str = "native") -> Tuple[np.ndarray, dict]:
     if unit_normalized not in {"native", "hu", "density", "bmd"}:
         raise ValueError("unit must be one of: 'native', 'hu', 'density', or 'bmd'")
 
+    converted_dtype = np.dtype(dtype)
+    if converted_dtype not in (np.dtype(np.float32), np.dtype(np.float64)):
+        raise ValueError("calibrated dtype must be float32 or float64")
     arr, meta = _aimio.read_isq(path)
     meta = _augment_isq_meta(path, meta)
 
@@ -226,12 +230,16 @@ def read_isq(path: str, unit: str = "native") -> Tuple[np.ndarray, dict]:
 
     if unit_normalized == "hu":
         m, b = get_isq_hu_equation(meta)
-        arr = arr.astype(float) * m + b
+        arr = arr.astype(converted_dtype)
+        arr *= m
+        arr += b
         meta["unit"] = "HU"
         return arr, meta
 
     m, b = get_isq_density_equation(meta)
-    arr = arr.astype(float) * m + b
+    arr = arr.astype(converted_dtype)
+    arr *= m
+    arr += b
     meta["unit"] = "BMD"
     return arr, meta
 

@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.4.2 — 2026-10-07
+
+- Read large ISQs with `nr_of_bytes=0` directly into NumPy from the voxel dimensions/data offset, avoiding AimIO's invalid payload-vector allocation and extra full-volume copy. Validate payload length before allocating.
+- Convert calibrated ISQ values in place into float32 by default to reduce memory use in Slicer. Use `dtype=np.float64` when double precision is required; native values remain int16.
 
 - Correct ISQ density conversion by dividing the extended-header attenuation-to-density slope by `mu_scaling`. Expose the original physical slope as `density_slope`; `rescale_slope` now converts native voxels to density. Native pixels and HU conversion are unchanged.
 
