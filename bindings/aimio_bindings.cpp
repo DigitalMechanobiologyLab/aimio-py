@@ -3,6 +3,10 @@
 #include <pybind11/stl.h>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <limits>
+#include <algorithm>
+#include <cstdint>
 
 namespace py = pybind11;
 
@@ -169,10 +173,46 @@ PYBIND11_MODULE(_aimio, m) {
         int nx = isq.dimensions_p[0];
         int ny = isq.dimensions_p[1];
         int nz = isq.dimensions_p[2];
-        size_t n = static_cast<size_t>(nx) * ny * nz;
-
+        // Large Scanco ISQs use nr_of_bytes=0 and a valid block count.
+        // AimIO's payload vector subtracts the data offset from that zero,
+        // underflowing its size. ISQ voxels are uncompressed little-endian
+        // int16: stream directly into NumPy using dimensions and the offset.
+        size_t n = 1;
+        for (int extent : {nx, ny, nz}) {
+            if (extent <= 0 || n > static_cast<size_t>(std::numeric_limits<py::ssize_t>::max())
+                                      / sizeof(short) / static_cast<size_t>(extent)) {
+                throw py::value_error("Invalid or overflowing ISQ dimensions");
+            }
+            n *= static_cast<size_t>(extent);
+        }
+        const auto bytes = n * sizeof(short);
+        std::ifstream input(path, std::ios::binary | std::ios::ate);
+        const auto end = static_cast<std::streamoff>(input.tellg());
+        if (!input || isq.data_offset < 512 || end < isq.data_offset ||
+                static_cast<uint64_t>(end - isq.data_offset) < bytes) {
+            throw py::value_error("ISQ payload is truncated or its data offset is invalid");
+        }
+        if (isq.nr_of_bytes <= 0 && isq.nr_of_blocks <= 0) {
+            throw py::value_error("ISQ requires a valid byte count or block count");
+        }
         py::array_t<short> arr({nz, ny, nx});
-        isq.ReadImageData(arr.mutable_data(), n);
+        input.seekg(isq.data_offset);
+        auto *destination = reinterpret_cast<char *>(arr.mutable_data());
+        {
+            py::gil_scoped_release release;
+            for (size_t done = 0; done < bytes;) {
+                const auto chunk = std::min<size_t>(bytes - done, 16 * 1024 * 1024);
+                if (!input.read(destination + done, static_cast<std::streamsize>(chunk))) {
+                    throw std::runtime_error("ISQ payload was truncated during reading");
+                }
+                done += chunk;
+            }
+        }
+        // Preserve native values on hosts with a big-endian short representation.
+        const uint16_t endian_test = 1;
+        if (*reinterpret_cast<const unsigned char *>(&endian_test) != 1) {
+            for (size_t i = 0; i < bytes; i += 2) std::swap(destination[i], destination[i+1]);
+        }
         return py::make_tuple(arr, isqfile_to_dict(isq));
     }, py::arg("path"));
 }

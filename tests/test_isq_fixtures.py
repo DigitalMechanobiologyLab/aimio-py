@@ -26,7 +26,10 @@ def test_calibrated_fixture_reads_native_hu_and_bmd():
     assert np.unique(hu).tolist() == [-1000.0, -999.0]
     assert hu_meta["unit"] == "HU"
 
-    assert np.unique(bmd).tolist() == [3.0, 3.002]
+    # The file stores a physical density slope of 2 per 1/cm, mu_scaling=1000.
+    np.testing.assert_allclose(np.unique(bmd), [3.0, 3.002])
+    assert native_meta["density_slope"] == 2.0
+    assert native_meta["rescale_slope"] == .002
     assert bmd_meta["unit"] == "BMD"
     assert bmd_meta["rescale_units"] == "mg HA/ccm"
 
