@@ -40,7 +40,7 @@ jobs:
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -110,7 +110,7 @@ jobs:
           submodules: recursive
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -150,7 +150,7 @@ jobs:
           path: dist
 
       - name: Set up Python for debug tooling
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
