@@ -39,7 +39,7 @@ jobs:
           path: dist
 
       - name: Set up Python for debug tooling
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
