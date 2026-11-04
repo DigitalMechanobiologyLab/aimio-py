@@ -273,3 +273,84 @@ def test_gobj_subtractive_contour_removes_strict_interior(tmp_path):
     expected[:, 2, 4] = 127
     expected[:, 3, 1:5] = 127
     assert np.array_equal(image, expected)
+
+
+def _write_gobj_with_empty_slices(path, empty_field_7, number_empty_slices=True):
+    """Three empty slice records, then one slice with a 6 x 5 contour at z=3."""
+    center_x = 12
+    center_y = 15
+    width = 6
+    height = 5
+    z = 3
+
+    header = bytearray(512)
+    header[:16] = b"CTDATA-HEADER_V1"
+    header[16:20] = struct.pack("<i", 6)
+    header[32:44] = struct.pack("<3i", 32, 32, 4)
+    header[44:56] = struct.pack("<3i", 3200, 3200, 400)
+    header[508:512] = struct.pack("<i", 0)
+
+    empty = b"".join(
+        struct.pack(
+            "<13i",
+            1,
+            0,
+            0,
+            empty_z if number_empty_slices else 0,
+            0,
+            0,
+            0,
+            empty_field_7,
+            20,
+            0,
+            0,
+            16512,
+            16512,
+        )
+        for empty_z in range(z)
+    )
+    top = struct.pack(
+        "<13i",
+        1,
+        center_x,
+        center_y,
+        z,
+        width,
+        height,
+        0,
+        3,
+        20,
+        0,
+        0,
+        16512,
+        16512,
+    )
+    outer = _contour_record(1, center_x, center_y, z, width, height, header_size=72)
+    path.write_bytes(bytes(header) + empty + top + outer)
+
+
+def test_read_gobj_accepts_empty_slice_records_with_zero_in_field_7(tmp_path):
+    reference_path = tmp_path / "reference.GOBJ"
+    variant_path = tmp_path / "variant.GOBJ"
+    _write_gobj_with_empty_slices(reference_path, empty_field_7=3)
+    _write_gobj_with_empty_slices(variant_path, empty_field_7=0, number_empty_slices=False)
+
+    reference, reference_info = api.read_gobj(reference_path)
+    variant, variant_info = api.read_gobj(variant_path)
+
+    assert np.array_equal(variant, reference)
+    assert variant.shape == (1, 5, 6)
+    assert variant_info["position"] == reference_info["position"] == (10, 13, 3)
+    assert variant_info["slice_count"] == reference_info["slice_count"] == 1
+    assert np.array_equal(
+        api.read_gobj(variant_path, crop="header")[0],
+        api.read_gobj(reference_path, crop="header")[0],
+    )
+
+
+def test_read_gobj_rejects_other_slice_record_field_7_values(tmp_path):
+    path = tmp_path / "unknown.GOBJ"
+    _write_gobj_with_empty_slices(path, empty_field_7=1)
+
+    with pytest.raises(ValueError, match="Unsupported GOBJ contour structure at byte 512"):
+        api.read_gobj(path)

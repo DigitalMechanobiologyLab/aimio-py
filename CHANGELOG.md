@@ -2,6 +2,7 @@
 
 ## 0.4.2 — 2026-10-07
 
+- Read GOBJs whose empty slice records carry 0 instead of 3 in field 7 (written by some Scanco exports), which previously failed with "Unsupported GOBJ contour structure at byte 512". Other record fields are still checked.
 - Read large ISQs with `nr_of_bytes=0` directly into NumPy from the voxel dimensions/data offset, avoiding AimIO's invalid payload-vector allocation and extra full-volume copy. Validate payload length before allocating.
 - Convert calibrated ISQ values in place into float32 by default to reduce memory use in Slicer. Use `dtype=np.float64` when double precision is required; native values remain int16.
 
