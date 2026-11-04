@@ -3,6 +3,7 @@
 ## 0.4.2 — 2026-10-07
 
 - Read GOBJs whose empty slice records (width and height 0) carry 0 instead of 3 in field 7 (written by some Scanco exports), which previously failed with "Unsupported GOBJ contour structure at byte 512". Non-empty slice records still require 3, and the other record fields are still checked.
+- Read GOBJ header dimensions from bytes 44-55 (voxels) and 56-67 (µm), as in the ISQ/RAD CTDATA header, instead of 32-43 and 44-55. The old offsets read the scanner ID and creation date, so `spacing`, `origin` and `crop="header"` geometry were wrong for scanner-written GOBJs; decoded masks and voxel `position` are unchanged.
 - Read large ISQs with `nr_of_bytes=0` directly into NumPy from the voxel dimensions/data offset, avoiding AimIO's invalid payload-vector allocation and extra full-volume copy. Validate payload length before allocating.
 - Convert calibrated ISQ values in place into float32 by default to reduce memory use in Slicer. Use `dtype=np.float64` when double precision is required; native values remain int16.
 

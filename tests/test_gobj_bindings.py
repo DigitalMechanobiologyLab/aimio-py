@@ -92,6 +92,18 @@ def _contour_record(material, center_x, center_y, z, width, height, header_size=
     )
 
 
+def _ctdata_header(dimensions, dimensions_um):
+    header = bytearray(512)
+    header[:16] = b"CTDATA-HEADER_V1"
+    header[16:20] = struct.pack("<i", 6)
+    # Scanner ID and creation date precede the geometry, as in scanner files.
+    header[32:44] = struct.pack("<3i", 3517, -738157472, 11894656)
+    header[44:56] = struct.pack("<3i", *dimensions)
+    header[56:68] = struct.pack("<3i", *dimensions_um)
+    header[508:512] = struct.pack("<i", 0)
+    return header
+
+
 def _write_gobj(path, include_inner=False):
     center_x = 12
     center_y = 15
@@ -99,12 +111,7 @@ def _write_gobj(path, include_inner=False):
     height = 5
     z = 0
 
-    header = bytearray(512)
-    header[:16] = b"CTDATA-HEADER_V1"
-    header[16:20] = struct.pack("<i", 6)
-    header[32:44] = struct.pack("<3i", 32, 32, 1)
-    header[44:56] = struct.pack("<3i", 3200, 3200, 100)
-    header[508:512] = struct.pack("<i", 0)
+    header = _ctdata_header((32, 32, 1), (3200, 3200, 100))
 
     top = struct.pack(
         "<13i",
@@ -130,12 +137,7 @@ def _write_gobj(path, include_inner=False):
 
 
 def _write_primitive_gobj(path):
-    header = bytearray(512)
-    header[:16] = b"CTDATA-HEADER_V1"
-    header[16:20] = struct.pack("<i", 6)
-    header[32:44] = struct.pack("<3i", 16, 16, 1)
-    header[44:56] = struct.pack("<3i", 1600, 1600, 100)
-    header[508:512] = struct.pack("<i", 0)
+    header = _ctdata_header((16, 16, 1), (1600, 1600, 100))
 
     center_x = 6
     center_y = 7
@@ -283,12 +285,7 @@ def _write_gobj_with_empty_slices(path, empty_field_7, number_empty_slices=True)
     height = 5
     z = 3
 
-    header = bytearray(512)
-    header[:16] = b"CTDATA-HEADER_V1"
-    header[16:20] = struct.pack("<i", 6)
-    header[32:44] = struct.pack("<3i", 32, 32, 4)
-    header[44:56] = struct.pack("<3i", 3200, 3200, 400)
-    header[508:512] = struct.pack("<i", 0)
+    header = _ctdata_header((32, 32, 4), (3200, 3200, 400))
 
     empty = b"".join(
         struct.pack(
@@ -365,3 +362,18 @@ def test_read_gobj_rejects_non_empty_slice_record_with_zero_in_field_7(tmp_path)
 
     with pytest.raises(ValueError, match="Unsupported GOBJ contour structure at byte 512"):
         api.read_gobj(path)
+
+
+def test_gobj_info_reads_geometry_after_scanner_id_and_date(tmp_path):
+    path = tmp_path / "scanner.GOBJ"
+    _write_gobj(path)
+    data = bytearray(path.read_bytes())
+    data[44:68] = struct.pack("<6i", 2304, 2304, 168, 139852, 139852, 10197)
+    path.write_bytes(bytes(data))
+
+    info = api.gobj_info(path)
+
+    assert info["header_dimensions"] == (2304, 2304, 168)
+    assert info["header_dimensions_um"] == (139852, 139852, 10197)
+    assert info["spacing"] == pytest.approx((0.0607, 0.0607, 0.0607), abs=1e-4)
+    assert info["origin"] == pytest.approx(tuple(p * s for p, s in zip(info["position"], info["spacing"])))

@@ -90,8 +90,8 @@ def _parse_header(data: bytes) -> dict:
     if data_type != GOBJ_DATA_TYPE:
         raise ValueError(f"Expected GOBJ data type 6, found {data_type}")
 
-    dim_x, dim_y, dim_z = _unpack_from("<3i", data, 32)
-    dim_x_um, dim_y_um, dim_z_um = _unpack_from("<3i", data, 44)
+    dim_x, dim_y, dim_z = _unpack_from("<3i", data, 44)
+    dim_x_um, dim_y_um, dim_z_um = _unpack_from("<3i", data, 56)
     data_offset_blocks = _unpack_from("<i", data, 508)[0]
     data_offset = CTDATA_HEADER_SIZE + max(0, data_offset_blocks) * CTDATA_HEADER_SIZE
 
