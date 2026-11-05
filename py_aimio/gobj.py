@@ -117,7 +117,8 @@ def _is_slice_header(data: bytes, offset: int) -> bool:
     fields = _unpack_from("<13i", data, offset)
     return (
         fields[0] == 1
-        and fields[7] == 3
+        # Some Scanco exports write 0 instead of 3 in field 7 of empty slice records.
+        and (fields[7] == 3 or (fields[7] == 0 and fields[4] == 0 and fields[5] == 0))
         and fields[8] == SLICE_RECORD_KIND
         and fields[9] == 0
         and fields[10] == 0
