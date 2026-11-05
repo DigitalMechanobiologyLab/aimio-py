@@ -354,3 +354,14 @@ def test_read_gobj_rejects_other_slice_record_field_7_values(tmp_path):
 
     with pytest.raises(ValueError, match="Unsupported GOBJ contour structure at byte 512"):
         api.read_gobj(path)
+
+
+def test_read_gobj_rejects_non_empty_slice_record_with_zero_in_field_7(tmp_path):
+    path = tmp_path / "nonempty.GOBJ"
+    _write_gobj(path)
+    data = bytearray(path.read_bytes())
+    data[512 + 7 * 4 : 512 + 8 * 4] = struct.pack("<i", 0)
+    path.write_bytes(bytes(data))
+
+    with pytest.raises(ValueError, match="Unsupported GOBJ contour structure at byte 512"):
+        api.read_gobj(path)
