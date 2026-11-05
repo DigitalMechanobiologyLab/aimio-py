@@ -90,8 +90,8 @@ def _parse_header(data: bytes) -> dict:
     if data_type != GOBJ_DATA_TYPE:
         raise ValueError(f"Expected GOBJ data type 6, found {data_type}")
 
-    dim_x, dim_y, dim_z = _unpack_from("<3i", data, 32)
-    dim_x_um, dim_y_um, dim_z_um = _unpack_from("<3i", data, 44)
+    dim_x, dim_y, dim_z = _unpack_from("<3i", data, 44)
+    dim_x_um, dim_y_um, dim_z_um = _unpack_from("<3i", data, 56)
     data_offset_blocks = _unpack_from("<i", data, 508)[0]
     data_offset = CTDATA_HEADER_SIZE + max(0, data_offset_blocks) * CTDATA_HEADER_SIZE
 
@@ -117,7 +117,8 @@ def _is_slice_header(data: bytes, offset: int) -> bool:
     fields = _unpack_from("<13i", data, offset)
     return (
         fields[0] == 1
-        and fields[7] == 3
+        # Some Scanco exports write 0 instead of 3 in field 7 of empty slice records.
+        and (fields[7] == 3 or (fields[7] == 0 and fields[4] == 0 and fields[5] == 0))
         and fields[8] == SLICE_RECORD_KIND
         and fields[9] == 0
         and fields[10] == 0
